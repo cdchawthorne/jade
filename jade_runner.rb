@@ -145,11 +145,24 @@ class JadeRunner
     )
   )
 
+  CREATE_DB = Command.new(
+    lambda { |plain_args, options|
+      JadeDatabase.create(plain_args[0])
+    },
+    CommandMetadata.new(
+      %q{jade create_db DB_LOCATION},
+      %q{Create a new jade database at DB_LOCATION},
+      1,
+      []
+    )
+  )
+
   COMMANDS_BY_NAME = {
     'list_backups' => LIST_BACKUPS,
     'backup' => BACKUP,
     'restore_latest' => RESTORE_LATEST,
     'help' => HELP,
+    'create_db' => CREATE_DB,
   }
 
   def JadeRunner.run(args)
