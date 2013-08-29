@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+if [[ $(whoami) != root ]]; then
+    echo "must be run as root" 1>&2
+    exit 1
+fi
+
+jade_dir=/usr/lib/jade
+jade_src_dir=$(dirname "$(realpath "$0")")
+bin_dir=/usr/bin
+
+if [[ ! -d ${jade_dir} ]]; then
+    mkdir "${jade_dir}"
+fi
+
+cp "${jade_src_dir}/jade" "${bin_dir}"
+cp "${jade_src_dir}"/*.rb "${jade_dir}"
