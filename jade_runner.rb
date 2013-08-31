@@ -81,9 +81,9 @@ class JadeRunner
       JadeDatabase.new(db_location).backup(*plain_args)
     },
     CommandMetadata.new(
-      %q{jade backup FILENAME DESCRIPTION},
+      %q{jade backup FILENAME [DESCRIPTION]},
       %q{Make a backup of FILENAME},
-      2,
+      1..2,
       [
         ['db_location', ['-d', '--database-location DB_LOCATION',
                          'Specify the jade database to use']]
