@@ -8,9 +8,9 @@ module JadeExceptions
     end
   end
 
-  class NoBackupsError < JadeException
-    def initialize(filename)
-      super "No backups for #{filename}"
+  class BackupNotFoundError < JadeException
+    def initialize(backup_id)
+      super "No backups with ID #{backup_id}"
     end
   end
 
@@ -29,6 +29,19 @@ module JadeExceptions
   class DatabaseCreationError < JadeException
     def initialize(message)
       super "Database creation failed: #{message}"
+    end
+  end
+
+  class RestorationError < JadeException
+    def initialize(error_code)
+      super "Restoration failed: extracting tar failed with exit code" \
+              "#{error_code}"
+    end
+  end
+
+  class NoBackupsError < JadeException
+    def initialize(target)
+      super "No backups found for #{target}"
     end
   end
 end

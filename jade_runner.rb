@@ -1,6 +1,7 @@
 require 'optparse'
-require 'jade_database'
 require 'jade_exceptions'
+require 'jade_backup'
+require 'jade_database'
 
 class CommandMetadata
   attr_reader(:usage, :description)
@@ -73,12 +74,12 @@ class Command
 end
 
 class JadeRunner
-  DEFAULT_DB_LOCATION = Dir.home + "/.jade"
+  DEFAULT_DB_LOCATION = "#{Dir.home}/.#{%x{whoami}.chomp}_jade_db"
 
   BACKUP = Command.new(
     lambda { |plain_args, options|
       db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
-      JadeDatabase.new(db_location).backup(*plain_args)
+      JadeBackup.new_backup(db_location, *plain_args)
     },
     CommandMetadata.new(
       %q{jade backup FILENAME [DESCRIPTION]},
@@ -91,10 +92,28 @@ class JadeRunner
     )
   )
 
+  DELETE = Command.new(
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+      JadeBackup.new(db_location, *plain_args).delete
+    },
+    CommandMetadata.new(
+      %q{jade delete BACKUP_ID},
+      %q{Delete the backup specified by BACKUP_ID},
+      1,
+      [
+        ['db_location', ['-d', '--database-location DB_LOCATION',
+                         'Specify the jade database to use']]
+      ]
+    )
+  )
+
   RESTORE_LATEST = Command.new(
     lambda { |plain_args, options|
       db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
-      JadeDatabase.new(db_location).restore_latest(*plain_args)
+      backups = JadeBackup.list_backups(db_location, *plain_args)
+      raise JadeExceptions::NoBackupsError.new(*plain_args) if backups.empty?
+      backups.first.restore
     },
     CommandMetadata.new(
       %q{jade restore_latest FILENAME},
@@ -107,16 +126,36 @@ class JadeRunner
     )
   )
 
-  LIST_BACKUPS = Command.new(
+  RESTORE = Command.new(
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+      backup_id = plain_args.shift
+
+      backup = JadeBackup.new(db_location, backup_id)
+      backup.restore(*plain_args)
+    },
+    CommandMetadata.new(
+      %q{jade restore BACKUP_ID [FILE]},
+      "Restore the backup identified by BACKUP_ID; if present, only" \
+        "restore FILE",
+      1..2,
+      [
+        ['db_location', ['-d', '--database-location DB_LOCATION',
+                         'Specify the jade database to use']]
+      ]
+    )
+  )
+
+  LIST = Command.new(
     lambda { |plain_args, options|
       db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
 
-      for row in JadeDatabase.new(db_location).list_backups(*plain_args)
+      JadeBackup.list_backups(db_location, *plain_args).each { |row|
         $stdout.puts(row.join('    |    '))
-      end
+      }
     },
     CommandMetadata.new(
-      %q{jade list_backups [FILENAME]},
+      %q{jade list [FILENAME]},
       %q{List all backups; if present, only show backups of FILENAME},
       0..1,
       [
@@ -157,15 +196,43 @@ class JadeRunner
     )
   )
 
+  INFO = Command.new(
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+
+      backup = JadeBackup.new(db_location, *plain_args)
+      $stdout.puts(backup.format_verbose)
+    },
+    CommandMetadata.new(
+      %q{jade info BACKUP_ID},
+      %q{Prints the metadata for the backup specified by BACKUP_ID},
+      1,
+      [
+        ['db_location', ['-d', '--database-location DB_LOCATION',
+                         'Specify the jade database to use']]
+      ]
+    )
+  )
+
   COMMANDS_BY_NAME = {
-    'list_backups' => LIST_BACKUPS,
+    'list' => LIST,
     'backup' => BACKUP,
     'restore_latest' => RESTORE_LATEST,
     'help' => HELP,
     'create_db' => CREATE_DB,
+    'restore' => RESTORE,
+    'info' => INFO,
+    'delete' => DELETE,
   }
 
+  def JadeRunner.check_default_db
+    unless FileTest.directory?(DEFAULT_DB_LOCATION)
+      JadeDatabase.create(DEFAULT_DB_LOCATION)
+    end
+  end
+
   def JadeRunner.run(args)
+    check_default_db
     begin
       if args.empty?
         raise JadeExceptions::BadUsageError.new("No command given", jade_usage)
