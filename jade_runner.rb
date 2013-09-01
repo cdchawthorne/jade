@@ -150,8 +150,9 @@ class JadeRunner
     lambda { |plain_args, options|
       db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
 
-      JadeBackup.list_backups(db_location, *plain_args).each { |row|
-        $stdout.puts(row.join('    |    '))
+      JadeBackup.list_backups(db_location, *plain_args).each { |backup|
+        $stdout.puts(backup.format)
+        $stdout.puts("\n")
       }
     },
     CommandMetadata.new(
