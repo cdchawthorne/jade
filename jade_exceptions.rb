@@ -44,4 +44,11 @@ module JadeExceptions
       super "No backups found for #{target}"
     end
   end
+
+  class PushError < JadeException
+    def initialize(db_location, remote, error_code)
+      super "Push failed: rsync of #{db_location} to #{remote} failed with "\
+        "exit code #{error_code}"
+    end
+  end
 end

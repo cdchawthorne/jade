@@ -26,6 +26,12 @@ class JadeDatabase
       );
     }
     sql_db.execute(sql)
+
+    sql = %q{CREATE TABLE settings ( remote TEXT);}
+    sql_db.execute(sql)
+
+    sql = %q{INSERT INTO settings DEFAULT VALUES;}
+    sql_db.execute(sql)
   end
 
   def initialize(location)
@@ -41,6 +47,26 @@ class JadeDatabase
     end
   end
 
+  def push(remote=nil)
+    remote = get_default_remote unless remote
+    success = system('rsync', '-avz', '--delete', "#{@location}/", remote)
+    unless success
+      raise JadeExceptions::PushError.new(@location, remote, $?.exit_status)
+    end
+  end
+
+  def get_default_remote
+    rows = execute_sql(%q{SELECT remote FROM settings;})
+    unless rows.length == 1
+      raise JadeException::CorruptedDatabaseError.new(@sql_db_location)
+    end
+    rows.first.first
+  end
+
+  def set_default_remote(remote_location)
+    execute_sql(%q{UPDATE settings SET remote = ?;}, remote_location)
+  end
+
   def get_archive_location(backup_id)
     "#{@location}/backup_archives/#{backup_id}.tar.gz"
   end
@@ -48,5 +74,4 @@ class JadeDatabase
   def last_insert_row_id
     @sql_db.last_insert_row_id
   end
-
 end

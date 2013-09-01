@@ -50,9 +50,9 @@ class CommandMetadata
 end
 
 class Command
-  def initialize(execute, metadata)
-    @execute = execute
+  def initialize(metadata, execute)
     @metadata = metadata
+    @execute = execute
   end
 
   def run(args)
@@ -77,10 +77,6 @@ class JadeRunner
   DEFAULT_DB_LOCATION = "#{Dir.home}/.#{%x{whoami}.chomp}_jade_db"
 
   BACKUP = Command.new(
-    lambda { |plain_args, options|
-      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
-      JadeBackup.new_backup(db_location, *plain_args)
-    },
     CommandMetadata.new(
       %q{jade backup FILENAME [DESCRIPTION]},
       %q{Make a backup of FILENAME},
@@ -89,14 +85,14 @@ class JadeRunner
         ['db_location', ['-d', '--database-location DB_LOCATION',
                          'Specify the jade database to use']]
       ]
-    )
+    ),
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+      JadeBackup.new_backup(db_location, *plain_args)
+    },
   )
 
   DELETE = Command.new(
-    lambda { |plain_args, options|
-      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
-      JadeBackup.new(db_location, *plain_args).delete
-    },
     CommandMetadata.new(
       %q{jade delete BACKUP_ID},
       %q{Delete the backup specified by BACKUP_ID},
@@ -105,16 +101,14 @@ class JadeRunner
         ['db_location', ['-d', '--database-location DB_LOCATION',
                          'Specify the jade database to use']]
       ]
-    )
+    ),
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+      JadeBackup.new(db_location, *plain_args).delete
+    },
   )
 
   RESTORE_LATEST = Command.new(
-    lambda { |plain_args, options|
-      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
-      backups = JadeBackup.list_backups(db_location, *plain_args)
-      raise JadeExceptions::NoBackupsError.new(*plain_args) if backups.empty?
-      backups.first.restore
-    },
     CommandMetadata.new(
       %q{jade restore_latest FILENAME},
       %q{Restore the most recent backup of FILENAME},
@@ -123,10 +117,26 @@ class JadeRunner
         ['db_location', ['-d', '--database-location DB_LOCATION',
                          'Specify the jade database to use']]
       ]
-    )
+    ),
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+      backups = JadeBackup.list_backups(db_location, *plain_args)
+      raise JadeExceptions::NoBackupsError.new(*plain_args) if backups.empty?
+      backups.first.restore
+    },
   )
 
   RESTORE = Command.new(
+    CommandMetadata.new(
+      %q{jade restore BACKUP_ID [FILE]},
+      "Restore the backup identified by BACKUP_ID; if present, only " \
+        "restore FILE",
+      1..2,
+      [
+        ['db_location', ['-d', '--database-location DB_LOCATION',
+                         'Specify the jade database to use']]
+      ]
+    ),
     lambda { |plain_args, options|
       db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
       backup_id = plain_args.shift
@@ -134,27 +144,9 @@ class JadeRunner
       backup = JadeBackup.new(db_location, backup_id)
       backup.restore(*plain_args)
     },
-    CommandMetadata.new(
-      %q{jade restore BACKUP_ID [FILE]},
-      "Restore the backup identified by BACKUP_ID; if present, only" \
-        "restore FILE",
-      1..2,
-      [
-        ['db_location', ['-d', '--database-location DB_LOCATION',
-                         'Specify the jade database to use']]
-      ]
-    )
   )
 
   LIST = Command.new(
-    lambda { |plain_args, options|
-      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
-
-      JadeBackup.list_backups(db_location, *plain_args).each { |backup|
-        $stdout.puts(backup.format)
-        $stdout.puts("\n")
-      }
-    },
     CommandMetadata.new(
       %q{jade list [FILENAME]},
       %q{List all backups; if present, only show backups of FILENAME},
@@ -163,47 +155,98 @@ class JadeRunner
         ['db_location', ['-d', '--database-location DB_LOCATION',
                          'Specify the jade database to use']]
       ]
-    )
+    ),
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+
+      JadeBackup.list_backups(db_location, *plain_args).each { |backup|
+        $stdout.puts(backup.format)
+        $stdout.puts("\n")
+      }
+    },
+  )
+
+  PUSH = Command.new(
+    CommandMetadata.new(
+      %q{jade push [REMOTE_LOCATION]},
+      "Store a copy of the database in REMOTE_LOCATION; if absent, use the " \
+      "default remote location for the database",
+      0..1,
+      [
+        ['db_location', ['-d', '--database-location DB_LOCATION',
+                         'Specify the jade database to use']]
+      ]
+    ),
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+      JadeDatabase.new(db_location).push(*plain_args)
+    },
+  )
+
+  GET_REMOTE = Command.new(
+    CommandMetadata.new(
+      %q{jade get_remote},
+      %q{Output the default remote location for the database},
+      0,
+      [
+        ['db_location', ['-d', '--database-location DB_LOCATION',
+                         'Specify the jade database to use']]
+      ]
+    ),
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+      $stdout.puts(JadeDatabase.new(db_location).get_default_remote)
+    },
+  )
+
+  SET_REMOTE = Command.new(
+    CommandMetadata.new(
+      %q{jade set_remote REMOTE_LOCATION},
+      %q{Set the default remote location for the database},
+      1,
+      [
+        ['db_location', ['-d', '--database-location DB_LOCATION',
+                         'Specify the jade database to use']]
+      ]
+    ),
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+      JadeDatabase.new(db_location).set_default_remote(*plain_args)
+    },
   )
 
   HELP = Command.new(
-    lambda { |plain_args, options|
-      if plain_args.empty?
-        $stdout.puts jade_usage
-      elsif COMMANDS_BY_NAME[plain_args[0]]
-        $stdout.puts COMMANDS_BY_NAME[plain_args[0]].detailed_help
-      else
-        raise JadeExceptions::BadUsageError.new("Command not found",
-                                                jade_usage)
-      end
-    },
     CommandMetadata.new(
       %q{jade help [COMMAND]},
       %q{Present a list of commands; if present, show help for COMMAND},
       0..1,
       []
-    )
+    ),
+    lambda { |plain_args, options|
+      if plain_args.empty?
+        $stdout.puts(jade_usage)
+      elsif COMMANDS_BY_NAME[plain_args[0]]
+        $stdout.puts(COMMANDS_BY_NAME[plain_args[0]].detailed_help)
+      else
+        raise JadeExceptions::BadUsageError.new("Command not found",
+                                                jade_usage)
+      end
+    },
   )
 
   CREATE_DB = Command.new(
-    lambda { |plain_args, options|
-      JadeDatabase.create(plain_args[0])
-    },
     CommandMetadata.new(
       %q{jade create_db DB_LOCATION},
       %q{Create a new jade database at DB_LOCATION},
       1,
       []
-    )
+    ),
+    lambda { |plain_args, options|
+      JadeDatabase.create(plain_args[0])
+    },
   )
 
   INFO = Command.new(
-    lambda { |plain_args, options|
-      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
-
-      backup = JadeBackup.new(db_location, *plain_args)
-      $stdout.puts(backup.format_verbose)
-    },
     CommandMetadata.new(
       %q{jade info BACKUP_ID},
       %q{Prints the metadata for the backup specified by BACKUP_ID},
@@ -212,7 +255,13 @@ class JadeRunner
         ['db_location', ['-d', '--database-location DB_LOCATION',
                          'Specify the jade database to use']]
       ]
-    )
+    ),
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+
+      backup = JadeBackup.new(db_location, *plain_args)
+      $stdout.puts(backup.format_verbose)
+    },
   )
 
   COMMANDS_BY_NAME = {
@@ -224,6 +273,9 @@ class JadeRunner
     'restore' => RESTORE,
     'info' => INFO,
     'delete' => DELETE,
+    'get_remote' => GET_REMOTE,
+    'set_remote' => SET_REMOTE,
+    'push' => PUSH,
   }
 
   def JadeRunner.check_default_db

@@ -5,7 +5,7 @@ class JadeBackup
   def initialize(db_location, backup_id)
     db = JadeDatabase.new(db_location)
     sql = %q{
-      SELECT timestamp, source, description FROM backups WHERE ROWID = ?
+      SELECT timestamp, source, description FROM backups WHERE ROWID = ?;
     }
     timestamp, source, description = db.execute_sql(sql, backup_id).first
 
@@ -23,7 +23,7 @@ class JadeBackup
     db = JadeDatabase.new(db_location)
 
     sql = %q{
-      INSERT INTO backups (source, description) VALUES (?, ?)
+      INSERT INTO backups (source, description) VALUES (?, ?);
     }
     db.execute_sql(sql, File.absolute_path(source), description)
 
@@ -48,12 +48,12 @@ class JadeBackup
     db = JadeDatabase.new(db_location)
     if target
       sql = %q{
-        SELECT ROWID FROM backups WHERE source = ? ORDER BY timestamp DESC
+        SELECT ROWID FROM backups WHERE source = ? ORDER BY timestamp DESC;
       }
 
       backup_ids = db.execute_sql(sql, File.absolute_path(target)).flatten
     else
-      sql = %q{SELECT ROWID FROM backups ORDER BY timestamp DESC}
+      sql = %q{SELECT ROWID FROM backups ORDER BY timestamp DESC;}
       backup_ids = db.execute_sql(sql).flatten
     end
 
@@ -77,7 +77,7 @@ class JadeBackup
   end
 
   def delete
-    sql = %q{DELETE FROM backups WHERE ROWID = ?}
+    sql = %q{DELETE FROM backups WHERE ROWID = ?;}
     @db.execute_sql(sql, @backup_id)
     begin
       File.delete(@db.get_archive_location(@backup_id))
