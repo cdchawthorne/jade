@@ -1,5 +1,7 @@
 require 'sqlite3'
 require 'jade_exceptions'
+require 'fileutils'
+require 'tmpdir'
 
 class JadeDatabase
 
@@ -49,11 +51,58 @@ class JadeDatabase
 
   def push(remote=nil)
     remote = get_default_remote unless remote
+    raise JadeExceptions::NoRemoteDatabaseError.new(@location) unless remote
     success = system('rsync', '-avz', '--delete', "#{@location}/", remote)
     unless success
-      raise JadeExceptions::PushError.new(@location, remote, $?.exit_status)
+      raise JadeExceptions::PushError.new(@location, remote, $?.exitstatus)
     end
   end
+
+  def pull(remote=nil)
+    remote = get_default_remote unless remote
+    raise JadeExceptions::NoRemoteDatabaseError.new(@location) unless remote
+
+    dir = Dir.mktmpdir("jade")
+    begin
+      success = system('rsync', '-avz', '--delete', "#{remote}/", dir)
+      unless success
+        raise JadeExceptions::PullError.new(dir, remote, $?.exitstatus)
+      end
+      unless JadeDatabase.new(dir).valid?
+        raise JadeExceptions::BadRemoteDatabaseError.new(remote)
+      end
+      FileUtils.rm_rf(@location)
+      FileUtils.mv(dir, @location)
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+
+  end
+
+  def valid?
+    return false unless File.directory?("#{@location}/backup_archives")
+    fs_archives = Dir.entries("#{@location}/backup_archives") - [".", ".."]
+    fs_archives.collect! { |file| "#{@location}/backup_archives/#{file}" }
+
+    begin
+      execute_sql('SELECT * FROM settings;')
+    rescue JadeExceptions::CorruptedDatabaseError
+      return false
+    end
+
+    begin
+      rowids = execute_sql('SELECT ROWID FROM backups;').flatten
+    rescue JadeExceptions::CorruptedDatabaseError
+      return false
+    end
+
+    db_archives = rowids.collect { |rowid| get_archive_location(rowid) }
+
+    return false unless db_archives == fs_archives
+
+    true
+  end
+
 
   def get_default_remote
     rows = execute_sql(%q{SELECT remote FROM settings;})

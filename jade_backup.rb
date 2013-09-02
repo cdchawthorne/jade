@@ -85,6 +85,13 @@ class JadeBackup
     end
   end
 
+  def dump_archive(io_object)
+    archive = File.new(@db.get_archive_location(@backup_id))
+    while chars = archive.read(65536)
+      io_object.write(chars)
+    end
+  end
+
   def format
     "ID: #{@backup_id}\nTimestamp: #{@timestamp}\nSource: #{@source}\n" \
       "Description: #{@description}"

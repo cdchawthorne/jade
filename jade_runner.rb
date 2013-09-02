@@ -183,6 +183,43 @@ class JadeRunner
     },
   )
 
+  PULL = Command.new(
+    CommandMetadata.new(
+      %q{jade pull [REMOTE_LOCATION]},
+      "Replace the database with that in REMOTE_LOCATION; if absent, use the" \
+      " default remote location for the database",
+      0..1,
+      [
+        ['db_location', ['-d', '--database-location DB_LOCATION',
+                         'Specify the jade database to use']]
+      ]
+    ),
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+      JadeDatabase.new(db_location).pull(*plain_args)
+    }
+  )
+
+  VALIDATE = Command.new(
+    CommandMetadata.new(
+      %q{jade validate},
+      %q{Check whether the database is a valid jade database},
+      0,
+      [
+        ['db_location', ['-d', '--database-location DB_LOCATION',
+                         'Specify the jade database to use']]
+      ]
+    ),
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+      if JadeDatabase.new(db_location).valid?
+        puts "Valid"
+      else
+        puts "Corrupted"
+      end
+    }
+  )
+
   GET_REMOTE = Command.new(
     CommandMetadata.new(
       %q{jade get_remote},
@@ -264,6 +301,36 @@ class JadeRunner
     },
   )
 
+  FETCH_ARCHIVE = Command.new(
+    CommandMetadata.new(
+      %q{jade fetch_archive BACKUP_ID DST},
+      %q{Dump the archive of the backup to DST (stdout if DST is '-')},
+      2,
+      [
+        ['db_location', ['-d', '--database-location DB_LOCATION',
+                         'Specify the jade database to use']]
+      ]
+    ),
+    lambda { |plain_args, options|
+      db_location = options.fetch('db_location', DEFAULT_DB_LOCATION)
+      backup_id, dst = plain_args
+      backup = JadeBackup.new(db_location, backup_id)
+
+      if dst == '-'
+        io_object = $stdout
+      else
+        begin
+          io_object = File.new(dst, 'w')
+        rescue SystemCallError => error
+          raise JadeExceptions::BadDestError.new(error.message)
+        end
+      end
+
+      backup.dump_archive(io_object)
+    }
+  )
+
+
   COMMANDS_BY_NAME = {
     'list' => LIST,
     'backup' => BACKUP,
@@ -276,6 +343,9 @@ class JadeRunner
     'get_remote' => GET_REMOTE,
     'set_remote' => SET_REMOTE,
     'push' => PUSH,
+    'pull' => PULL,
+    'validate' => VALIDATE,
+    'fetch_archive' => FETCH_ARCHIVE,
   }
 
   def JadeRunner.check_default_db

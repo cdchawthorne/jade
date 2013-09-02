@@ -47,8 +47,33 @@ module JadeExceptions
 
   class PushError < JadeException
     def initialize(db_location, remote, error_code)
-      super "Push failed: rsync of #{db_location} to #{remote} failed with "\
+      super "Push failed: rsync of #{db_location} to #{remote} failed with " \
         "exit code #{error_code}"
+    end
+  end
+
+  class PullError < JadeException
+    def initialize(target_dir, remote, error_code)
+      super "Pull failed: rsync of #{remote} to #{target_dir} failed with " \
+        "exit code #{error_code}"
+    end
+  end
+
+  class BadRemoteDatabaseError < JadeException
+    def initialize(remote)
+      super "#{remote} is not a valid jade database"
+    end
+  end
+
+  class NoRemoteDatabaseError < JadeException
+    def initialize(db_location)
+      super "No default remote database in #{db_location}"
+    end
+  end
+
+  class BadDestError < JadeException
+    def initialize(message)
+      super "Bad destination: #{message}"
     end
   end
 end
