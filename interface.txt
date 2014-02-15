@@ -1,0 +1,32 @@
+All operations will have an optional db parameter specifying the location of
+the jade database to use. Find some way to default this to
+${HOME}/.$(whoami)_jade_db.
+
+jade backup FOO [COMMENT] [-d JADE_DB]
+jade restore_latest FOO [-d JADE_DB] # Restore most recent backup
+jade list FOO [-d JADE_DB] # List backups of FOO
+jade info BACKUP_ID # List backup metadata and files in BACKUP_ID
+jade init DB_LOCATION
+jade restore BACKUP_ID [FILE]
+jade fetch_archive BACKUP_ID DST # Dumps the archive to DST (stdout if -)
+
+Include some way to store and retrieve from a remote jade database.
+jade push [REMOTE_LOCATION] [-d JADE_DB]
+jade pull [REMOTE_LOCATION] [-d JADE_DB] # check that remote database is well-formed
+jade set_remote REMOTE_LOCATION [-d JADE_DB]
+jade get_remote [-d JADE_DB]
+
+jade manage [-d JADE_DB] # ncurses interface, allows deletion and restoration
+
+DEFER: allow some way to backup directly to a remote jade db. Possibly require
+that the remote machine have jade installed.
+
+Database stuff:
+CREATE TABLE backups (
+    timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    source TEXT NOT NULL, description TEXT
+);
+CREATE INDEX backups_source_timestamp_idx ON backups (source, timestamp);
+CREATE INDEX backups_timestamp_idx ON backups(timestamp);
+
+TODO: allow encrypted backups

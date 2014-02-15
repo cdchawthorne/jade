@@ -62,7 +62,7 @@ class JadeBackup
 
   def restore(file=nil)
     file = @source unless file
-    $stdout.puts "Restore #{target} from the following backup?"
+    $stdout.puts "Restore #{file} from the following backup?"
     $stdout.puts format
     $stdout.print "(y/n) "
 
