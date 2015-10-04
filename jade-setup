@@ -5,13 +5,17 @@ if [[ $(whoami) != root ]]; then
     exit 1
 fi
 
-jade_dir=/usr/lib/jade
+jade_dir=/usr/local/lib/jade
 jade_src_dir=$(dirname "$(realpath "$0")")
-bin_dir=/usr/bin
+bin_dir=/usr/local/bin
 
 if [[ ! -d ${jade_dir} ]]; then
     mkdir "${jade_dir}"
+    chmod a+rx "${jade_dir}"
 fi
 
 cp "${jade_src_dir}/jade" "${bin_dir}"
+chmod a+rx "${bin_dir}/jade"
+
 cp "${jade_src_dir}"/*.rb "${jade_dir}"
+chmod a+r "${jade_dir}"/*.rb
